@@ -1,0 +1,40 @@
+{
+  "name": "deckotron",
+  "version": "0.1.0",
+  "description": "A tool for compiling HTML presentation decks.",
+  "main": "dist/deckotron.js",
+  "scripts": {
+    "clean": "rimraf dist/*",
+    "prebuild": "npm run clean",
+    "build": "webpack",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "webpack --watch"
+  },
+  "keywords": [
+    "presentation",
+    "deck",
+    "slides",
+    "powerpoint",
+    "keynote",
+    "html",
+    "web"
+  ],
+  "author": "James Nash <cirrus@twiddles.com>",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deckotron/deckotron.git"
+  },
+  "bugs": {
+    "url": "https://github.com/deckotron/deckotron/issues"
+  },
+  "homepage": "https://github.com/deckotron/deckotron#readme",
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.0",
+    "rimraf": "^2.6.1",
+    "webpack": "^3.5.5",
+    "webpack-node-externals": "^1.6.0"
+  }
+}
