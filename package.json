@@ -1,7 +1,7 @@
 {
   "name": "deckotron",
   "version": "0.1.0",
-  "description": "A tool for compiling HTML presentation decks.",
+  "description": "A build-time tool for compiling HTML presentation decks.",
   "main": "dist/deckotron.js",
   "scripts": {
     "clean": "rimraf dist/*",

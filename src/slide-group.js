@@ -3,52 +3,66 @@ import path from 'path';
 import Slide from './slide.js';
 import { makeName } from './utils.js';
 
-
-const slideTemplateExtensions = /^\.nunj$/i;
-const slideHtmlExtensions = /^\.html?$/i;
-const slideMarkdownExtensions = /^\.md$/i;
-
-const slideDirSuffix = /^\.slide$/i;
 const groupDirSuffix = /^\.group$/i;
 
 class SlideGroup {
 
   constructor(dir, name, level = 1) {
-    this.slides = [];
-    this.dir = dir;
-    this.level = level;
+    this._slides = [];
+    this._dir = dir;
+    this._level = level;
     this.name = name || makeName(dir);
   }
 
 
+  /**
+   * Searches for a slide or group owned by this group
+   * and returns it, if found.
+   *
+   * @param {*} name
+   */
   getSlideOrGroup(name) {
-    return this.slides.find((slide) => {return name === slide.name});
+    return this._slides.find((slide) => {return name === slide.name});
   }
 
 
-  createOrUpdateSlide(fullPath, slideFile) {
+  /**
+   * Adds the slideFile info to an existing slide in this group,
+   * if one exists. Otherwise, creates a new slide and adds it
+   * to this group.
+   *
+   * @param {*} fullPath
+   * @param {*} slideFile
+   */
+  _createOrUpdateSlide(fullPath, slideFile) {
     let slide = this.getSlideOrGroup(makeName(fullPath));
 
     if(!slide){
       slide = new Slide(slideFile, this);
-      this.slides.push(slide);
+      this._slides.push(slide);
     }
     else{
-      slide.addFiles(slideFile);
+      slide.addSlideFileOrDir(slideFile);
     }
 
     return slide;
   }
 
 
-  createOrUpdateSlideOrGroup(fileOrDir) {
+  /**
+   * Checks if a given file or directory is a slide or
+   * group. If so, it creates the respective slide or
+   * group and adds it to this group.
+   *
+   * @param {*} fileOrDir
+   */
+  _processFileOrDir(fileOrDir) {
     return new Promise((resolve, reject) => {
-      let fullPath = path.resolve(this.dir, fileOrDir);
+      let fullPath = path.resolve(this._dir, fileOrDir);
 
       fs.stat(fullPath, (err, stats) => {
         if(err) {
-          reject(err);
-          return;
+          throw err;
         }
         let slideOrGroup = false;
         let ext = path.extname(fullPath);
@@ -56,33 +70,46 @@ class SlideGroup {
         if (stats.isFile()) {
           let slideFile;
 
-          if (ext.match(slideTemplateExtensions) !== null) {
+          if (ext.match(Slide.templateExtensions) !== null) {
             slideFile = { tmplFile: fullPath };
           }
-          else if (ext.match(slideHtmlExtensions) !== null) {
+          else if (ext.match(Slide.htmlExtensions) !== null) {
             slideFile = { htmlFile: fullPath };
           }
-          else if (ext.match(slideMarkdownExtensions) !== null) {
+          else if (ext.match(Slide.markdownExtensions) !== null) {
             slideFile = { mdFile: fullPath };
           }
 
           if(slideFile){
-            slideOrGroup = this.createOrUpdateSlide(fullPath, slideFile);
+            slideOrGroup = this._createOrUpdateSlide(fullPath, slideFile);
           }
         }
         else if (stats.isDirectory()) {
-          if (ext.match(slideDirSuffix) !== null) {
+          if (ext.match(Slide.dirSuffix) !== null) {
             let slideFile = { slideDir: fullPath };
-            slideOrGroup = this.createOrUpdateSlide(fullPath, slideFile);
+            slideOrGroup = this._createOrUpdateSlide(fullPath, slideFile);
           }
           else if (ext.match(groupDirSuffix) !== null) {
-            slideOrGroup = new SlideGroup(fullPath, false, (this.level + 1));
-            this.slides.push(slideOrGroup);
+            slideOrGroup = new SlideGroup(fullPath, false, (this._level + 1));
+            this._slides.push(slideOrGroup);
           }
         }
 
         resolve(slideOrGroup);
       });
+    }).then((slideOrGroup) => {
+      if(slideOrGroup instanceof Slide){
+        // Return a Promise that resolves to the slide
+        // once all its related files have been discovered.
+        return slideOrGroup.discoverRelatedFiles();
+      }
+      else if(slideOrGroup instanceof SlideGroup){
+        // Return a Promise that resolves to the subgroup
+        // once it has rescanned itself for slides and groups.
+        return slideOrGroup.rescanDirForSlides().then(()=>{
+          return slideOrGroup;
+        });
+      }
     });
   }
 
@@ -100,21 +127,20 @@ class SlideGroup {
   rescanDirForSlides() {
     return new Promise((resolve, reject) => {
       fs.readdir(
-        this.dir,
+        this._dir,
         (err, dirContents) => {
           if (err) {
-            reject(err);
-            return;
+            throw err;
           }
 
           const nonHiddenContents = dirContents.filter((file) => { return file.charAt(0) !== '.'; });
 
           // Check all files asynchronously
           Promise.all(
-            nonHiddenContents.map((fileOrDir) => {return this.createOrUpdateSlideOrGroup(fileOrDir)})
-          )
-            .then((values) => {resolve(this.slides);})
-            .catch((err) => {reject(err);});
+            nonHiddenContents.map((fileOrDir) => {return this._processFileOrDir(fileOrDir)})
+          ).then((values) => {
+            resolve(this._slides);
+          });
         }
       );
     });
